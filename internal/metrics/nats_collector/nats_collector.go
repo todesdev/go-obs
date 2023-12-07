@@ -1,6 +1,8 @@
 package natscollector
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/todesdev/go-obs/internal/logging"
 )
@@ -89,8 +91,8 @@ func (collector *NATSCollector) ProcessedMessagesInc(subject string, messageType
 	collector.processedMessages.WithLabelValues(messageType, subject).Inc()
 }
 
-func (collector *NATSCollector) ProcessingDurationObserve(subject string, messageType string, duration float64) {
-	collector.processingDuration.WithLabelValues(messageType, subject).Observe(duration)
+func (collector *NATSCollector) ProcessingDurationObserve(subject string, messageType string, duration time.Duration) {
+	collector.processingDuration.WithLabelValues(messageType, subject).Observe(float64(duration) / float64(time.Second))
 }
 
 func (collector *NATSCollector) PublishedMessagesInc(subject string, messageType string) {
