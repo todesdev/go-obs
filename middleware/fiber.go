@@ -18,7 +18,7 @@ import (
 func Observability() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// TODO: Figure out how to store and retrieve these endpoints from a config file
-		if c.Path() == "/metrics" || c.Path() == "/health" || c.Path() == "/ready" {
+		if c.Route().Path == "/metrics" || c.Route().Path == "/health" || c.Route().Path == "/ready" {
 			return c.Next()
 		}
 
@@ -33,8 +33,8 @@ func Observability() fiber.Handler {
 			reqHeader.Add(string(k), string(v))
 		})
 
-		path := c.Path()
-		method := c.Method()
+		path := c.Route().Path
+		method := c.Route().Method
 
 		processName := "HTTP:" + method + ":" + path
 
