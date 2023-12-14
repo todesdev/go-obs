@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/todesdev/go-obs/internal/otlp_metrics/http_metrics"
 	"net/http"
 	"time"
 
@@ -71,6 +72,66 @@ func Observability() fiber.Handler {
 
 		logger.Info("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
 
+		return nil
+	}
+}
+
+func ObservabilityOTLP() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if c.Path() == "/health" || c.Path() == "/ready" {
+			return c.Next()
+		}
+
+		startTime := time.Now()
+
+		requestID := uuid.New().String()
+		c.Request().Header.Set("X-Request-ID", requestID)
+		c.Response().Header.Set("X-Request-ID", requestID)
+
+		reqHeader := make(http.Header)
+		c.Request().Header.VisitAll(func(k, v []byte) {
+			reqHeader.Add(string(k), string(v))
+		})
+
+		path := c.Path()
+		method := c.Method()
+
+		processName := "HTTP:" + method + ":" + path
+
+		ctx := otel.GetTextMapPropagator().Extract(c.Context(), propagation.HeaderCarrier(reqHeader))
+		ctx, span := tracing.NewTrace(ctx, tracing.SpanServer, processName)
+		defer span.End()
+
+		c.SetUserContext(ctx)
+
+		logger := logging.TracedLoggerWithProcess(span, processName)
+		logger.Info("Request received", zap.String("requestID", requestID))
+
+		http_metrics.IncreaseRequestsInFlight(ctx, method)
+
+		err := c.Next()
+		if err != nil {
+			elapsedTime := time.Since(startTime)
+			statusCode := c.Response().StatusCode()
+
+			http_metrics.RecordRequest(ctx, method, statusCode)
+			http_metrics.RecordResponseTime(ctx, method, statusCode, elapsedTime)
+			http_metrics.DecreaseRequestsInFlight(ctx, method)
+
+			logger.Error("Request error", zap.Error(err))
+			span.RecordError(err)
+
+			return c.Status(fiber.StatusNotFound).SendString("Sorry I can't find that!")
+		}
+
+		elapsedTime := time.Since(startTime)
+		statusCode := c.Response().StatusCode()
+
+		http_metrics.RecordRequest(ctx, method, statusCode)
+		http_metrics.RecordResponseTime(ctx, method, statusCode, elapsedTime)
+		http_metrics.DecreaseRequestsInFlight(ctx, method)
+
+		logger.Info("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
 		return nil
 	}
 }

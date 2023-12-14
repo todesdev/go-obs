@@ -10,7 +10,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -27,7 +26,7 @@ const (
 
 var service string
 
-func SetupOtlpGrpcTracer(tracingGPRCEndpoint, serviceName string) error {
+func SetupOtlpGrpcTracer(tracingGPRCEndpoint, serviceName string, res *resource.Resource) error {
 	logger := logging.LoggerWithProcess("TracingSetup")
 	logger.Info("Setting up OLTP GRPC tracing")
 
@@ -38,26 +37,26 @@ func SetupOtlpGrpcTracer(tracingGPRCEndpoint, serviceName string) error {
 		return err
 	}
 
-	tp, err := configureOtlpGrpcTraceProvider(ctx, conn, serviceName)
+	tp, err := configureOtlpGrpcTraceProvider(ctx, conn, res)
 	if err != nil {
 		logger.Fatal("Failed to configure trace provider", zap.Error(err))
 		return err
 	}
 
+	service = serviceName
+
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
-
-	service = serviceName
 
 	logger.Info("Tracing setup complete")
 	return nil
 }
 
-func SetupStdOutTracer(serviceName string) error {
+func SetupStdOutTracer(serviceName string, res *resource.Resource) error {
 	logger := logging.LoggerWithProcess("TracingSetup")
 	logger.Info("Setting up STDOUT tracing")
 
-	tp, err := configureStdOutTraceProvider(serviceName)
+	tp, err := configureStdOutTraceProvider(res)
 	if err != nil {
 		logger.Fatal("Failed to configure trace provider", zap.Error(err))
 		return err
@@ -76,6 +75,26 @@ func NewTrace(ctx context.Context, spanKind trace.SpanKind, processName string) 
 	return otel.Tracer(service).Start(ctx, processName, trace.WithSpanKind(spanKind))
 }
 
+func NewInternalTrace(ctx context.Context, processName string) (context.Context, trace.Span) {
+	return otel.Tracer(service).Start(ctx, processName, trace.WithSpanKind(SpanInternal))
+}
+
+func NewServerTrace(ctx context.Context, processName string) (context.Context, trace.Span) {
+	return otel.Tracer(service).Start(ctx, processName, trace.WithSpanKind(SpanServer))
+}
+
+func NewClientTrace(ctx context.Context, processName string) (context.Context, trace.Span) {
+	return otel.Tracer(service).Start(ctx, processName, trace.WithSpanKind(SpanClient))
+}
+
+func NewProducerTrace(ctx context.Context, processName string) (context.Context, trace.Span) {
+	return otel.Tracer(service).Start(ctx, processName, trace.WithSpanKind(SpanProducer))
+}
+
+func NewConsumerTrace(ctx context.Context, processName string) (context.Context, trace.Span) {
+	return otel.Tracer(service).Start(ctx, processName, trace.WithSpanKind(SpanConsumer))
+}
+
 func connectToOTLPCollector(ctx context.Context, tracingGRPCEndpoint string) (*grpc.ClientConn, error) {
 	return grpc.DialContext(ctx, tracingGRPCEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -83,7 +102,7 @@ func connectToOTLPCollector(ctx context.Context, tracingGRPCEndpoint string) (*g
 	)
 }
 
-func configureOtlpGrpcTraceProvider(ctx context.Context, conn *grpc.ClientConn, serviceName string) (*sdktrace.TracerProvider, error) {
+func configureOtlpGrpcTraceProvider(ctx context.Context, conn *grpc.ClientConn, res *resource.Resource) (*sdktrace.TracerProvider, error) {
 	exporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithGRPCConn(conn))
 	if err != nil {
 		return nil, err
@@ -92,15 +111,11 @@ func configureOtlpGrpcTraceProvider(ctx context.Context, conn *grpc.ClientConn, 
 	return sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(
-			resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(serviceName),
-			)),
+		sdktrace.WithResource(res),
 	), nil
 }
 
-func configureStdOutTraceProvider(serviceName string) (*sdktrace.TracerProvider, error) {
+func configureStdOutTraceProvider(res *resource.Resource) (*sdktrace.TracerProvider, error) {
 	exporter, err := stdouttrace.New()
 	if err != nil {
 		return nil, err
@@ -109,10 +124,6 @@ func configureStdOutTraceProvider(serviceName string) (*sdktrace.TracerProvider,
 	return sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(
-			resource.NewWithAttributes(
-				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(serviceName),
-			)),
+		sdktrace.WithResource(res),
 	), nil
 }

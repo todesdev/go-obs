@@ -11,7 +11,7 @@ import (
 
 var logger *zap.Logger
 
-func Setup(serviceName string) {
+func Setup(serviceName, serviceVersion string) {
 	rawJSON := []byte(`{
 		  "level": "info",
 		  "encoding": "json",
@@ -44,7 +44,11 @@ func Setup(serviceName string) {
 		instanceID = generateRandomInstanceID()
 	}
 
-	logger = logger.With(zap.String("service", serviceName), zap.String("instanceID", instanceID))
+	logger = logger.With(
+		zap.String("service", serviceName),
+		zap.String("version", serviceVersion),
+		zap.String("instanceID", instanceID),
+	)
 }
 
 func getLogger() *zap.Logger {

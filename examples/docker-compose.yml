@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  example:
+    container_name: example
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - OTLP_GRPC_ENDPOINT=otlp-collector:4317
+
+  vector:
+    build:
+      context: ./vector
+      dockerfile: Dockerfile
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9000:9000"
+    depends_on:
+      - otlp-collector
+
+  otlp-collector:
+    container_name: otlp-collector
+    image: otel/opentelemetry-collector-contrib:latest
+    volumes:
+      - ./otlp/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
