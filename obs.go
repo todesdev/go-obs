@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/gofiber/fiber/v2"
+	"github.com/todesdev/go-obs/internal/metrics"
 	"github.com/todesdev/go-obs/internal/otlp_metrics"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
@@ -32,7 +33,7 @@ type Config struct {
 	MetricsEndpoint       string
 	EnableFiberMiddleware bool
 	EnableMetricsHandler  bool
-	MetricsGRPC           bool
+	MetricsPrometheus     bool
 	TracingGRPC           bool
 	GRPCEndpoint          string
 }
@@ -50,8 +51,8 @@ func Initialize(config *Config) error {
 		return err
 	}
 
-	if validatedConfig.MetricsGRPC {
-		err = otlp_metrics.SetupOTLPMetricGRPCExporter(validatedConfig.GRPCEndpoint, res)
+	if validatedConfig.MetricsPrometheus {
+		err = otlp_metrics.SetupPrometheusExporter(res)
 		if err != nil {
 			return err
 		}
@@ -73,17 +74,24 @@ func Initialize(config *Config) error {
 		}
 	}
 
+	//if validatedConfig.EnableMetricsHandler {
+	//	registerOTLPPrometheusMetricsHandler(validatedConfig.FiberApp, validatedConfig.MetricsEndpoint)
+	//}
+
+	promRegistry := &prometheus.Registry{}
+
 	if validatedConfig.EnableFiberMiddleware {
-		validatedConfig.FiberApp.Use(middleware.ObservabilityOTLP())
+		//validatedConfig.FiberApp.Use(middleware.ObservabilityOTLP())
+		promRegistry = metrics.Setup(validatedConfig.ServiceName, validatedConfig.MetricsEndpoint)
 	}
 
-	//if validatedConfig.EnableFiberMiddleware {
-	//	registerFiberMiddleware(validatedConfig.FiberApp)
-	//}
-	//
-	//if validatedConfig.EnableMetricsHandler {
-	//	registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsEndpoint)
-	//}
+	if validatedConfig.EnableFiberMiddleware {
+		registerFiberMiddleware(validatedConfig.FiberApp)
+	}
+
+	if validatedConfig.EnableMetricsHandler {
+		registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsEndpoint)
+	}
 
 	return nil
 }
@@ -119,10 +127,14 @@ func validateConfig(cfg *Config) (*Config, error) {
 		validatedConfig.MetricsEndpoint = cfg.MetricsEndpoint
 	}
 
-	if cfg.MetricsGRPC && cfg.GRPCEndpoint == "" {
-		return nil, errors.New("metrics push mode is enabled but grpc endpoint is empty")
-	} else {
-		validatedConfig.GRPCEndpoint = cfg.GRPCEndpoint
+	//if cfg.MetricsPrometheus && cfg.GRPCEndpoint == "" {
+	//	return nil, errors.New("metrics push mode is enabled but grpc endpoint is empty")
+	//} else {
+	//	validatedConfig.GRPCEndpoint = cfg.GRPCEndpoint
+	//}
+
+	if cfg.MetricsPrometheus {
+		validatedConfig.MetricsPrometheus = cfg.MetricsPrometheus
 	}
 
 	if cfg.TracingGRPC && cfg.GRPCEndpoint == "" {
@@ -151,6 +163,11 @@ func registerFiberMiddleware(fiberApp *fiber.App) {
 
 func registerFiberMetricsHandler(fiberApp *fiber.App, registry *prometheus.Registry, metricsEndpoint string) {
 	metricsHandler := adaptor.HTTPHandler(promhttp.HandlerFor(registry, promhttp.HandlerOpts{}))
+	fiberApp.Get(metricsEndpoint, metricsHandler)
+}
+
+func registerOTLPPrometheusMetricsHandler(fiberApp *fiber.App, metricsEndpoint string) {
+	metricsHandler := adaptor.HTTPHandler(promhttp.Handler())
 	fiberApp.Get(metricsEndpoint, metricsHandler)
 }
 

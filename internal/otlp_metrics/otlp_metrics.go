@@ -6,6 +6,7 @@ import (
 	"github.com/todesdev/go-obs/internal/otlp_metrics/system_metrics"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"google.golang.org/grpc"
@@ -30,6 +31,31 @@ func SetupOTLPMetricGRPCExporter(metricsGRPCEndpoint string, res *resource.Resou
 			metric.NewPeriodicReader(metricsExporter),
 		),
 	)
+	otel.SetMeterProvider(meterProvider)
+
+	err = system_metrics.Setup()
+	if err != nil {
+		return err
+	}
+
+	err = http_metrics.Setup()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func SetupPrometheusExporter(res *resource.Resource) error {
+	exporter, err := prometheus.New()
+	if err != nil {
+		return err
+	}
+
+	meterProvider := metric.NewMeterProvider(
+		metric.WithResource(res),
+		metric.WithReader(exporter))
+
 	otel.SetMeterProvider(meterProvider)
 
 	err = system_metrics.Setup()

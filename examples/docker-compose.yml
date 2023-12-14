@@ -1,26 +1,28 @@
 version: "3.9"
 
 services:
-  example:
-    container_name: example
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    environment:
-      - OTLP_GRPC_ENDPOINT=otlp-collector:4317
+#  example:
+#    container_name: example
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    ports:
+#      - "3000:3000"
+#    environment:
+#      - OTLP_GRPC_ENDPOINT=otlp-collector:4317
+#    depends_on:
+#      - otlp-collector
 
-  vector:
-    build:
-      context: ./vector
-      dockerfile: Dockerfile
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "9000:9000"
-    depends_on:
-      - otlp-collector
+#  vector:
+#    build:
+#      context: ./vector
+#      dockerfile: Dockerfile
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock
+#    ports:
+#      - "9000:9000"
+#    depends_on:
+#      - otlp-collector
 
   otlp-collector:
     container_name: otlp-collector

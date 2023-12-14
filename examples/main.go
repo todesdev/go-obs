@@ -4,7 +4,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	goobs "github.com/todesdev/go-obs"
-	"os"
 )
 
 func main() {
@@ -15,12 +14,13 @@ func main() {
 		FiberApp:              app,
 		ServiceName:           "example_app",
 		ServiceVersion:        "0.0.1",
-		MetricsEndpoint:       "",
-		EnableFiberMiddleware: false,
-		EnableMetricsHandler:  false,
-		MetricsGRPC:           true,
-		TracingGRPC:           true,
-		GRPCEndpoint:          os.Getenv("OTLP_GRPC_ENDPOINT"),
+		MetricsEndpoint:       "/metrics",
+		EnableFiberMiddleware: true,
+		EnableMetricsHandler:  true,
+		MetricsPrometheus:     true,
+		TracingGRPC:           false,
+		//GRPCEndpoint:          os.Getenv("OTLP_GRPC_ENDPOINT"),
+		GRPCEndpoint: "",
 	})
 
 	app.Get("/", func(c *fiber.Ctx) error {

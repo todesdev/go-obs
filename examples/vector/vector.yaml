@@ -14,6 +14,8 @@ transforms:
 sinks:
   my_sink_id:
     type: http
+    encoding:
+      codec: json
     inputs:
       - parse_json
     uri: http://otlp-collector:4318

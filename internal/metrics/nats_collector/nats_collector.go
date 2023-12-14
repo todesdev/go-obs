@@ -1,6 +1,7 @@
 package natscollector
 
 import (
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,6 +29,7 @@ const (
 var natsCollector *NATSCollector
 
 type NATSCollector struct {
+	mu                 sync.Mutex
 	processedMessages  *prometheus.CounterVec
 	processingDuration *prometheus.HistogramVec
 	publishedMessages  *prometheus.CounterVec
@@ -88,13 +90,19 @@ func GetNATSCollector() *NATSCollector {
 }
 
 func (collector *NATSCollector) ProcessedMessagesInc(subject string, messageType string) {
+	collector.mu.Lock()
 	collector.processedMessages.WithLabelValues(messageType, subject).Inc()
+	collector.mu.Unlock()
 }
 
 func (collector *NATSCollector) ProcessingDurationObserve(subject string, messageType string, duration time.Duration) {
+	collector.mu.Lock()
 	collector.processingDuration.WithLabelValues(messageType, subject).Observe(float64(duration) / float64(time.Second))
+	collector.mu.Unlock()
 }
 
 func (collector *NATSCollector) PublishedMessagesInc(subject string, messageType string) {
+	collector.mu.Lock()
 	collector.publishedMessages.WithLabelValues(messageType, subject).Inc()
+	collector.mu.Unlock()
 }

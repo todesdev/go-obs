@@ -2,6 +2,7 @@ package httpcollector
 
 import (
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -28,6 +29,7 @@ var (
 )
 
 type HttpCollector struct {
+	mu               sync.Mutex
 	requestCount     *prometheus.CounterVec
 	responseTime     *prometheus.HistogramVec
 	requestsInFlight *prometheus.GaugeVec
@@ -87,18 +89,25 @@ func GetHttpCollector() *HttpCollector {
 }
 
 func (collector *HttpCollector) IncRequestCount(method string, statusCode int) {
-
+	collector.mu.Lock()
 	collector.requestCount.WithLabelValues(method, strconv.Itoa(statusCode)).Inc()
+	collector.mu.Unlock()
 }
 
 func (collector *HttpCollector) ObserveResponseTime(method string, statusCode int, duration time.Duration) {
+	collector.mu.Lock()
 	collector.responseTime.WithLabelValues(method, strconv.Itoa(statusCode)).Observe(float64(duration) / float64(time.Second))
+	collector.mu.Unlock()
 }
 
 func (collector *HttpCollector) IncRequestsInFlight(method string) {
+	collector.mu.Lock()
 	collector.requestsInFlight.WithLabelValues(method).Inc()
+	collector.mu.Unlock()
 }
 
 func (collector *HttpCollector) DecRequestsInFlight(method string) {
+	collector.mu.Lock()
 	collector.requestsInFlight.WithLabelValues(method).Dec()
+	collector.mu.Unlock()
 }
