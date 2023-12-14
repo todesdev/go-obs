@@ -31,7 +31,7 @@ func Observability() fiber.Handler {
 			reqHeader.Add(string(k), string(v))
 		})
 
-		path := c.Route().Path
+		path := c.Path()
 		method := c.Route().Method
 
 		processName := "HTTP:" + method + ":" + path
