@@ -8,7 +8,7 @@ import (
 	systemcollector "github.com/todesdev/go-obs/internal/metrics/system_collector"
 )
 
-func Setup(serviceName, metricsEndpoint string) *prometheus.Registry {
+func Setup(serviceName string) *prometheus.Registry {
 	logger := logging.LoggerWithProcess("MetricsSetup")
 	logger.Info("Setting up metrics...")
 

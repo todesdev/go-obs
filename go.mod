@@ -9,13 +9,9 @@ require (
 	github.com/prometheus/client_golang v1.17.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	go.opentelemetry.io/otel v1.21.0
-	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v0.44.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.21.0
-	go.opentelemetry.io/otel/exporters/prometheus v0.44.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.21.0
-	go.opentelemetry.io/otel/metric v1.21.0
 	go.opentelemetry.io/otel/sdk v1.21.0
-	go.opentelemetry.io/otel/sdk/metric v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.59.0
@@ -49,6 +45,7 @@ require (
 	github.com/valyala/tcplisten v1.0.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.3 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.21.0 // indirect
+	go.opentelemetry.io/otel/metric v1.21.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
