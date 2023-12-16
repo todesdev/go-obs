@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"github.com/gofiber/fiber/v2"
+	"github.com/todesdev/go-obs/interceptors"
 	"github.com/todesdev/go-obs/internal/metrics"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	"google.golang.org/grpc"
 
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus"
@@ -124,6 +127,19 @@ func registerResource(serviceName, serviceVersion string) (*resource.Resource, e
 			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceVersionKey.String(serviceVersion),
 		))
+}
+
+func GRPCClientInterceptors() []grpc.ServerOption {
+	return []grpc.ServerOption{
+		grpc.StatsHandler(otelgrpc.NewClientHandler())}
+}
+
+func GRPCServerInterceptors() []grpc.ServerOption {
+	return []grpc.ServerOption{
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(interceptors.UnaryServerInterceptor()),
+		grpc.StreamInterceptor(interceptors.StreamServerInterceptor()),
+	}
 }
 
 func registerFiberMiddleware(fiberApp *fiber.App) {
