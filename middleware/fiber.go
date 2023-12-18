@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"go.opentelemetry.io/otel/codes"
 	"net/http"
 	"time"
 
@@ -68,6 +69,7 @@ func Observability() fiber.Handler {
 		metricsCollector.ObserveResponseTime(method, statusCode, elapsedTime)
 		metricsCollector.DecRequestsInFlight(method)
 
+		span.SetStatus(codes.Ok, "Request completed")
 		logger.Info("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
 
 		return nil
