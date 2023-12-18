@@ -15,14 +15,16 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, consumer string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, consumer string, handler SubscribeHandler, opts ...nats.SubOpt) {
 	sub, err := stream.QueueSubscribeSync(subject, consumer, opts...)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	err = handleSubscription(ctx, sub, handler)
-	return err
+	if err != nil {
+		panic(err)
+	}
 }
 
 func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler) error {
