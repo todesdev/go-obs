@@ -4,7 +4,6 @@ import (
 	"context"
 	goobs "github.com/todesdev/go-obs"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
 	"time"
@@ -15,16 +14,14 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, consumer string, handler SubscribeHandler, opts ...nats.SubOpt) {
-	sub, err := stream.QueueSubscribeSync(subject, consumer, opts...)
+func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	err = handleSubscription(ctx, sub, handler)
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
 
 func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler) error {
@@ -49,21 +46,15 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 		headers := propHeader(msg.Header)
 		ctx = prop.Extract(ctx, headers)
 
-		processName := "NATS:" + subject
+		obs := goobs.ConsumerObserver(ctx)
+		obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
 
-		c, span := goobs.NewConsumerTrace(ctx, processName)
-		logger := goobs.TracedLoggerWithProcess(span, processName)
-
-		logger.Info("NATS Consumer: Received new message")
-
-		err = handler(msg, c)
+		err = handler(msg, obs.Ctx())
 		if err != nil {
 			elapsedTime := time.Since(startTime)
 			natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
 
-			errMsg := "Error handling the message"
-			span.RecordError(err)
-			logger.Error(errMsg, zap.Error(err))
+			obs.RecordError("Error handling the message", err)
 
 			return err
 		}
@@ -72,19 +63,24 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 		natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
 		natsCollector.PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
 
-		span.SetStatus(codes.Ok, "Successfully processed message")
-		logger.Info("Successfully processed message")
+		obs.RecordInfo("Successfully processed message")
+
+		obs.End()
 	}
 }
 
 func PublishTracedMessage(ctx context.Context, js nats.JetStreamContext, subject string, data []byte) error {
-	c, span := goobs.NewProducerTrace(ctx, "NATS Producer: Sending message to JetStream")
-	_, err := js.PublishMsg(newMsg(c, subject, data))
+	obs := goobs.ProducerObserver(ctx)
+	defer obs.End()
+
+	obs.LogInfo("NATS Producer: Sending message to JetStream", zap.String("subject", subject))
+
+	_, err := js.PublishMsg(newMsg(obs.Ctx(), subject, data))
 	if err != nil {
 		return err
 	}
 
-	span.SetStatus(codes.Ok, "Sent message to JetStream")
+	obs.RecordInfo("Sent message to JetStream")
 
 	natscollector.GetNATSCollector().PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
 	return nil

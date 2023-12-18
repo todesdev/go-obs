@@ -4,20 +4,19 @@ import (
 	"context"
 	"errors"
 	"github.com/gofiber/fiber/v2"
-	"github.com/todesdev/go-obs/interceptors"
-	"github.com/todesdev/go-obs/internal/metrics"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"google.golang.org/grpc"
-
 	"github.com/gofiber/fiber/v2/middleware/adaptor"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/todesdev/go-obs/interceptors"
 	"github.com/todesdev/go-obs/internal/logging"
+	"github.com/todesdev/go-obs/internal/metrics"
 	"github.com/todesdev/go-obs/internal/tracing"
 	"github.com/todesdev/go-obs/middleware"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc"
 )
 
 type Config struct {
@@ -171,7 +170,7 @@ func NewConsumerTrace(ctx context.Context, processName string) (context.Context,
 	return tracing.NewConsumerTrace(ctx, processName)
 }
 
-func LoggerWithProcess(processName string) *logging.Logger {
+func SimpleLogger(processName string) *logging.Logger {
 	return logging.LoggerWithProcess(processName)
 }
 

@@ -1,15 +1,13 @@
 package middleware
 
 import (
-	"go.opentelemetry.io/otel/codes"
+	goobs "github.com/todesdev/go-obs"
 	"net/http"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/todesdev/go-obs/internal/logging"
 	httpcollector "github.com/todesdev/go-obs/internal/metrics/http_collector"
-	"github.com/todesdev/go-obs/internal/tracing"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
@@ -38,13 +36,13 @@ func Observability() fiber.Handler {
 		processName := "HTTP:" + method + ":" + path
 
 		ctx := otel.GetTextMapPropagator().Extract(c.Context(), propagation.HeaderCarrier(reqHeader))
-		ctx, span := tracing.NewServerTrace(ctx, processName)
-		defer span.End()
 
-		c.SetUserContext(ctx)
+		obs := goobs.ServerObserver(ctx, processName)
+		defer obs.End()
 
-		logger := logging.TracedLoggerWithProcess(span, processName)
-		logger.Info("Request received", zap.String("requestID", requestID))
+		c.SetUserContext(obs.Ctx())
+
+		obs.LogInfo("Request received", zap.String("requestID", requestID))
 
 		metricsCollector := httpcollector.GetHttpCollector()
 		metricsCollector.IncRequestsInFlight(method)
@@ -57,8 +55,7 @@ func Observability() fiber.Handler {
 			metricsCollector.ObserveResponseTime(method, fiber.StatusNotFound, elapsedTime)
 			metricsCollector.DecRequestsInFlight(method)
 
-			logger.Error("Request error", zap.Error(err))
-			span.RecordError(err)
+			obs.RecordError("Request error", err)
 
 			return c.Status(fiber.StatusNotFound).SendString("Sorry I can't find that!")
 		}
@@ -69,9 +66,7 @@ func Observability() fiber.Handler {
 		metricsCollector.ObserveResponseTime(method, statusCode, elapsedTime)
 		metricsCollector.DecRequestsInFlight(method)
 
-		span.SetStatus(codes.Ok, "Request completed")
-		logger.Info("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
-
+		obs.RecordInfo("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
 		return nil
 	}
 }
