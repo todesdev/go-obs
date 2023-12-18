@@ -2,7 +2,7 @@ package nats_wrappers
 
 import (
 	"context"
-	goobs "github.com/todesdev/go-obs"
+	"github.com/todesdev/go-obs/internal/observer"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
@@ -46,7 +46,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 		headers := propHeader(msg.Header)
 		ctx = prop.Extract(ctx, headers)
 
-		obs := goobs.ConsumerObserver(ctx)
+		obs := observer.ConsumerObserver(ctx)
 		obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
 
 		err = handler(msg, obs.Ctx())
@@ -70,7 +70,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 }
 
 func PublishTracedMessage(ctx context.Context, js nats.JetStreamContext, subject string, data []byte) error {
-	obs := goobs.ProducerObserver(ctx)
+	obs := observer.ProducerObserver(ctx)
 	defer obs.End()
 
 	obs.LogInfo("NATS Producer: Sending message to JetStream", zap.String("subject", subject))

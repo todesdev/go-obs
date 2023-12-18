@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	goobs "github.com/todesdev/go-obs"
+	"github.com/todesdev/go-obs/internal/observer"
 	"net/http"
 	"time"
 
@@ -37,7 +37,7 @@ func Observability() fiber.Handler {
 
 		ctx := otel.GetTextMapPropagator().Extract(c.Context(), propagation.HeaderCarrier(reqHeader))
 
-		obs := goobs.ServerObserver(ctx, processName)
+		obs := observer.ServerObserver(ctx, processName)
 		defer obs.End()
 
 		c.SetUserContext(obs.Ctx())
