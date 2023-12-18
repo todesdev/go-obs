@@ -17,9 +17,7 @@ type Observer struct {
 }
 
 func InternalObserver(ctx context.Context, processPrefix ...string) *Observer {
-	obs := &Observer{
-		ctx: ctx,
-	}
+	obs := &Observer{}
 
 	pc, _, _, _ := runtime.Caller(1)
 	p := runtime.FuncForPC(pc).Name()
@@ -28,13 +26,11 @@ func InternalObserver(ctx context.Context, processPrefix ...string) *Observer {
 		p = processPrefix[0] + ":" + p
 	}
 
-	return obs.observeInternal(p)
+	return obs.observeInternal(ctx, p)
 }
 
 func ServerObserver(ctx context.Context, processPrefix ...string) *Observer {
-	obs := &Observer{
-		ctx: ctx,
-	}
+	obs := &Observer{}
 
 	pc, _, _, _ := runtime.Caller(1)
 	p := runtime.FuncForPC(pc).Name()
@@ -43,13 +39,11 @@ func ServerObserver(ctx context.Context, processPrefix ...string) *Observer {
 		p = processPrefix[0] + ":" + p
 	}
 
-	return obs.observeServer(p)
+	return obs.observeServer(ctx, p)
 }
 
 func ClientObserver(ctx context.Context, processPrefix ...string) *Observer {
-	obs := &Observer{
-		ctx: ctx,
-	}
+	obs := &Observer{}
 
 	pc, _, _, _ := runtime.Caller(1)
 	p := runtime.FuncForPC(pc).Name()
@@ -58,13 +52,11 @@ func ClientObserver(ctx context.Context, processPrefix ...string) *Observer {
 		p = processPrefix[0] + ":" + p
 	}
 
-	return obs.observeClient(p)
+	return obs.observeClient(ctx, p)
 }
 
 func ProducerObserver(ctx context.Context, processPrefix ...string) *Observer {
-	obs := &Observer{
-		ctx: ctx,
-	}
+	obs := &Observer{}
 
 	pc, _, _, _ := runtime.Caller(1)
 	p := runtime.FuncForPC(pc).Name()
@@ -73,13 +65,11 @@ func ProducerObserver(ctx context.Context, processPrefix ...string) *Observer {
 		p = processPrefix[0] + ":" + p
 	}
 
-	return obs.observeProducer(p)
+	return obs.observeProducer(ctx, p)
 }
 
 func ConsumerObserver(ctx context.Context, processPrefix ...string) *Observer {
-	obs := &Observer{
-		ctx: ctx,
-	}
+	obs := &Observer{}
 
 	pc, _, _, _ := runtime.Caller(1)
 	p := runtime.FuncForPC(pc).Name()
@@ -88,11 +78,11 @@ func ConsumerObserver(ctx context.Context, processPrefix ...string) *Observer {
 		p = processPrefix[0] + ":" + p
 	}
 
-	return obs.observeConsumer(p)
+	return obs.observeConsumer(ctx, p)
 }
 
-func (o *Observer) observeInternal(process string) *Observer {
-	c, s := tracing.NewInternalTrace(o.ctx, process)
+func (o *Observer) observeInternal(ctx context.Context, process string) *Observer {
+	c, s := tracing.NewInternalTrace(ctx, process)
 	l := TracedLoggerWithProcess(s, process)
 	o.ctx = c
 	o.span = s
@@ -100,8 +90,8 @@ func (o *Observer) observeInternal(process string) *Observer {
 	return o
 }
 
-func (o *Observer) observeServer(process string) *Observer {
-	c, s := tracing.NewServerTrace(o.ctx, process)
+func (o *Observer) observeServer(ctx context.Context, process string) *Observer {
+	c, s := tracing.NewServerTrace(ctx, process)
 	l := TracedLoggerWithProcess(s, process)
 	o.ctx = c
 	o.span = s
@@ -109,8 +99,8 @@ func (o *Observer) observeServer(process string) *Observer {
 	return o
 }
 
-func (o *Observer) observeClient(process string) *Observer {
-	c, s := tracing.NewClientTrace(o.ctx, process)
+func (o *Observer) observeClient(ctx context.Context, process string) *Observer {
+	c, s := tracing.NewClientTrace(ctx, process)
 	l := TracedLoggerWithProcess(s, process)
 	o.ctx = c
 	o.span = s
@@ -118,8 +108,8 @@ func (o *Observer) observeClient(process string) *Observer {
 	return o
 }
 
-func (o *Observer) observeProducer(process string) *Observer {
-	c, s := tracing.NewProducerTrace(o.ctx, process)
+func (o *Observer) observeProducer(ctx context.Context, process string) *Observer {
+	c, s := tracing.NewProducerTrace(ctx, process)
 	l := TracedLoggerWithProcess(s, process)
 	o.ctx = c
 	o.span = s
@@ -127,8 +117,8 @@ func (o *Observer) observeProducer(process string) *Observer {
 	return o
 }
 
-func (o *Observer) observeConsumer(process string) *Observer {
-	c, s := tracing.NewConsumerTrace(o.ctx, process)
+func (o *Observer) observeConsumer(ctx context.Context, process string) *Observer {
+	c, s := tracing.NewConsumerTrace(ctx, process)
 	l := TracedLoggerWithProcess(s, process)
 	o.ctx = c
 	o.span = s
@@ -136,17 +126,20 @@ func (o *Observer) observeConsumer(process string) *Observer {
 	return o
 }
 
-func (o *Observer) RecordInfo(msg string, fields ...zap.Field) {
+func (o *Observer) RecordInfo(msg string) {
+	o.span.SetStatus(codes.Ok, msg)
+}
+
+func (o *Observer) RecordInfoWithLogging(msg string, fields ...zap.Field) {
 	o.span.SetStatus(codes.Ok, msg)
 	o.log.Info(msg, fields...)
 }
 
-func (o *Observer) RecordWarning(msg string, fields ...zap.Field) {
-	o.span.SetStatus(codes.Error, msg)
-	o.log.Warn(msg, fields...)
+func (o *Observer) RecordError(err error) {
+	o.span.RecordError(err)
 }
 
-func (o *Observer) RecordError(msg string, err error, fields ...zap.Field) {
+func (o *Observer) RecordErrorWithLogging(msg string, err error, fields ...zap.Field) {
 	o.span.RecordError(err)
 	fields = append(fields, zap.Error(err))
 	o.log.Error(msg, fields...)
@@ -163,6 +156,11 @@ func (o *Observer) LogWarning(msg string, fields ...zap.Field) {
 func (o *Observer) LogError(msg string, err error, fields ...zap.Field) {
 	fields = append(fields, zap.Error(err))
 	o.log.Error(msg, fields...)
+}
+
+func (o *Observer) LogFatal(msg string, err error, fields ...zap.Field) {
+	fields = append(fields, zap.Error(err))
+	o.log.Fatal(msg, fields...)
 }
 
 func (o *Observer) Ctx() context.Context {

@@ -54,7 +54,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 			elapsedTime := time.Since(startTime)
 			natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
 
-			obs.RecordError("Error handling the message", err)
+			obs.RecordErrorWithLogging("Error handling the message", err)
 
 			return err
 		}
@@ -63,7 +63,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 		natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
 		natsCollector.PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
 
-		obs.RecordInfo("Successfully processed message")
+		obs.RecordInfoWithLogging("Successfully processed message")
 
 		obs.End()
 	}
@@ -77,10 +77,11 @@ func PublishTracedMessage(ctx context.Context, js nats.JetStreamContext, subject
 
 	_, err := js.PublishMsg(newMsg(obs.Ctx(), subject, data))
 	if err != nil {
+		obs.RecordErrorWithLogging("Error sending message to JetStream", err)
 		return err
 	}
 
-	obs.RecordInfo("Sent message to JetStream")
+	obs.RecordInfoWithLogging("Sent message to JetStream")
 
 	natscollector.GetNATSCollector().PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
 	return nil

@@ -55,7 +55,7 @@ func Observability() fiber.Handler {
 			metricsCollector.ObserveResponseTime(method, fiber.StatusNotFound, elapsedTime)
 			metricsCollector.DecRequestsInFlight(method)
 
-			obs.RecordError("Request error", err)
+			obs.RecordErrorWithLogging("Request error", err)
 
 			return c.Status(fiber.StatusNotFound).SendString("Sorry I can't find that!")
 		}
@@ -66,7 +66,7 @@ func Observability() fiber.Handler {
 		metricsCollector.ObserveResponseTime(method, statusCode, elapsedTime)
 		metricsCollector.DecRequestsInFlight(method)
 
-		obs.RecordInfo("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
+		obs.RecordInfoWithLogging("Request completed", zap.String("requestID", requestID), zap.Int("statusCode", statusCode), zap.Duration("elapsedTime", elapsedTime))
 		return nil
 	}
 }
