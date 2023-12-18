@@ -46,7 +46,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 		headers := propHeader(msg.Header)
 		ctx = prop.Extract(ctx, headers)
 
-		obs := observer.ConsumerObserver(ctx)
+		obs := observer.ConsumerObserver(ctx, "NATS Consumer:"+subject)
 		obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
 
 		err = handler(msg, obs.Ctx())
@@ -70,7 +70,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 }
 
 func PublishTracedMessage(ctx context.Context, js nats.JetStreamContext, subject string, data []byte) error {
-	obs := observer.ProducerObserver(ctx)
+	obs := observer.ProducerObserver(ctx, "NATS Producer:"+subject)
 	defer obs.End()
 
 	obs.LogInfo("NATS Producer: Sending message to JetStream", zap.String("subject", subject))

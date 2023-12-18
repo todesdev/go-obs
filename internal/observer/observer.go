@@ -7,7 +7,6 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"runtime"
 )
 
 type Observer struct {
@@ -16,69 +15,34 @@ type Observer struct {
 	log  *logging.Logger
 }
 
-func InternalObserver(ctx context.Context, processPrefix ...string) *Observer {
+func InternalObserver(ctx context.Context, process string) *Observer {
 	obs := &Observer{}
 
-	pc, _, _, _ := runtime.Caller(1)
-	p := runtime.FuncForPC(pc).Name()
-
-	if len(processPrefix) > 0 {
-		p = processPrefix[0] + ":" + p
-	}
-
-	return obs.observeInternal(ctx, p)
+	return obs.observeInternal(ctx, process)
 }
 
-func ServerObserver(ctx context.Context, processPrefix ...string) *Observer {
+func ServerObserver(ctx context.Context, process string) *Observer {
 	obs := &Observer{}
 
-	pc, _, _, _ := runtime.Caller(1)
-	p := runtime.FuncForPC(pc).Name()
-
-	if len(processPrefix) > 0 {
-		p = processPrefix[0] + ":" + p
-	}
-
-	return obs.observeServer(ctx, p)
+	return obs.observeServer(ctx, process)
 }
 
-func ClientObserver(ctx context.Context, processPrefix ...string) *Observer {
+func ClientObserver(ctx context.Context, process string) *Observer {
 	obs := &Observer{}
 
-	pc, _, _, _ := runtime.Caller(1)
-	p := runtime.FuncForPC(pc).Name()
-
-	if len(processPrefix) > 0 {
-		p = processPrefix[0] + ":" + p
-	}
-
-	return obs.observeClient(ctx, p)
+	return obs.observeClient(ctx, process)
 }
 
-func ProducerObserver(ctx context.Context, processPrefix ...string) *Observer {
+func ProducerObserver(ctx context.Context, process string) *Observer {
 	obs := &Observer{}
 
-	pc, _, _, _ := runtime.Caller(1)
-	p := runtime.FuncForPC(pc).Name()
-
-	if len(processPrefix) > 0 {
-		p = processPrefix[0] + ":" + p
-	}
-
-	return obs.observeProducer(ctx, p)
+	return obs.observeProducer(ctx, process)
 }
 
-func ConsumerObserver(ctx context.Context, processPrefix ...string) *Observer {
+func ConsumerObserver(ctx context.Context, process string) *Observer {
 	obs := &Observer{}
 
-	pc, _, _, _ := runtime.Caller(1)
-	p := runtime.FuncForPC(pc).Name()
-
-	if len(processPrefix) > 0 {
-		p = processPrefix[0] + ":" + p
-	}
-
-	return obs.observeConsumer(ctx, p)
+	return obs.observeConsumer(ctx, process)
 }
 
 func (o *Observer) observeInternal(ctx context.Context, process string) *Observer {
