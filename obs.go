@@ -128,9 +128,9 @@ func registerResource(serviceName, serviceVersion string) (*resource.Resource, e
 		))
 }
 
-func GRPCClientInterceptors() []grpc.ServerOption {
-	return []grpc.ServerOption{
-		grpc.StatsHandler(otelgrpc.NewClientHandler())}
+func GRPCClientInterceptors() []grpc.DialOption {
+	return []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler())}
 }
 
 func GRPCServerInterceptors() []grpc.ServerOption {
