@@ -19,10 +19,10 @@ func LoggerWithProcess(processName string) *Logger {
 
 func TracedLoggerWithProcess(span trace.Span, processName string) *Logger {
 	mainLogger := getLogger()
-	traceID := getTraceID(span)
+	traceID, spanID := getTraceID(span)
 
 	return &Logger{
-		logger: mainLogger.With(zap.String("process", processName), zap.String("traceID", traceID)),
+		logger: mainLogger.With(zap.String("process", processName), zap.String("traceID", traceID), zap.String("spanID", spanID)),
 	}
 }
 
@@ -42,6 +42,6 @@ func (l *Logger) Fatal(msg string, fields ...zap.Field) {
 	l.logger.Fatal(msg, fields...)
 }
 
-func getTraceID(span trace.Span) string {
-	return span.SpanContext().TraceID().String()
+func getTraceID(span trace.Span) (string, string) {
+	return span.SpanContext().TraceID().String(), span.SpanContext().SpanID().String()
 }
