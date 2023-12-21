@@ -23,12 +23,9 @@ type Config struct {
 	FiberApp               *fiber.App
 	ServiceName            string
 	ServiceVersion         string
-	Prometheus             bool
-	EnableFiberMiddleware  bool
-	EnableMetricsHandler   bool
+	Region                 string
+	OTLPGRPCEndpoint       string
 	MetricsHandlerEndpoint string
-	TracingGRPC            bool
-	GRPCEndpoint           string
 }
 
 func Initialize(config *Config) error {
@@ -39,14 +36,13 @@ func Initialize(config *Config) error {
 
 	logging.Setup(validatedConfig.ServiceName, validatedConfig.ServiceVersion)
 
-	res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion)
+	res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
 	if err != nil {
 		return err
 	}
 
-	if validatedConfig.TracingGRPC {
-		err := tracing.SetupOtlpGrpcTracer(validatedConfig.GRPCEndpoint, validatedConfig.ServiceName, res)
-
+	if validatedConfig.OTLPGRPCEndpoint != "" {
+		err := tracing.SetupOtlpGrpcTracer(validatedConfig.OTLPGRPCEndpoint, validatedConfig.ServiceName, res)
 		if err != nil {
 			return err
 		}
@@ -60,17 +56,10 @@ func Initialize(config *Config) error {
 
 	promRegistry := &prometheus.Registry{}
 
-	if validatedConfig.Prometheus {
-		promRegistry = metrics.Setup(validatedConfig.ServiceName)
-	}
+	promRegistry = metrics.Setup(validatedConfig.ServiceName)
 
-	if validatedConfig.EnableFiberMiddleware {
-		registerFiberMiddleware(validatedConfig.FiberApp)
-	}
-
-	if validatedConfig.EnableMetricsHandler {
-		registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsHandlerEndpoint)
-	}
+	registerFiberMiddleware(validatedConfig.FiberApp)
+	registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsHandlerEndpoint)
 
 	return nil
 }
@@ -78,27 +67,17 @@ func Initialize(config *Config) error {
 func validateConfig(cfg *Config) (*Config, error) {
 	var validatedConfig Config
 
-	validatedConfig.TracingGRPC = cfg.TracingGRPC
-	validatedConfig.EnableFiberMiddleware = cfg.EnableFiberMiddleware
-	validatedConfig.EnableMetricsHandler = cfg.EnableMetricsHandler
-
 	if cfg.FiberApp == nil {
 		return nil, errors.New("fiber app is nil")
 	} else {
 		validatedConfig.FiberApp = cfg.FiberApp
 	}
 
-	if cfg.ServiceName == "" {
-		validatedConfig.ServiceName = "fiber_server"
-	} else {
-		validatedConfig.ServiceName = cfg.ServiceName
-	}
+	validatedConfig.ServiceName = cfg.ServiceName
+	validatedConfig.ServiceVersion = cfg.ServiceVersion
+	validatedConfig.Region = cfg.Region
 
-	if cfg.ServiceVersion == "" {
-		validatedConfig.ServiceVersion = "1.0.0"
-	} else {
-		validatedConfig.ServiceVersion = cfg.ServiceVersion
-	}
+	validatedConfig.OTLPGRPCEndpoint = cfg.OTLPGRPCEndpoint
 
 	if cfg.MetricsHandlerEndpoint == "" {
 		validatedConfig.MetricsHandlerEndpoint = "/metrics"
@@ -106,25 +85,16 @@ func validateConfig(cfg *Config) (*Config, error) {
 		validatedConfig.MetricsHandlerEndpoint = cfg.MetricsHandlerEndpoint
 	}
 
-	if cfg.Prometheus {
-		validatedConfig.Prometheus = cfg.Prometheus
-	}
-
-	if cfg.TracingGRPC && cfg.GRPCEndpoint == "" {
-		return nil, errors.New("tracing push mode is enabled but grpc endpoint is empty")
-	} else {
-		validatedConfig.GRPCEndpoint = cfg.GRPCEndpoint
-	}
-
 	return &validatedConfig, nil
 }
 
-func registerResource(serviceName, serviceVersion string) (*resource.Resource, error) {
+func registerResource(serviceName, serviceVersion, region string) (*resource.Resource, error) {
 	return resource.Merge(resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String(serviceName),
 			semconv.ServiceVersionKey.String(serviceVersion),
+			semconv.CloudRegion(region),
 		))
 }
 

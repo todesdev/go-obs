@@ -2,6 +2,8 @@ package tracing
 
 import (
 	"context"
+	"net"
+	"time"
 
 	"github.com/todesdev/go-obs/internal/logging"
 	"go.opentelemetry.io/otel"
@@ -96,6 +98,20 @@ func NewConsumerTrace(ctx context.Context, processName string) (context.Context,
 }
 
 func connectToOTLPCollector(ctx context.Context, tracingGRPCEndpoint string) (*grpc.ClientConn, error) {
+
+	timeout := 2 * time.Second
+	conn, err := net.DialTimeout("tcp", tracingGRPCEndpoint, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			return
+		}
+	}(conn)
+
 	return grpc.DialContext(ctx, tracingGRPCEndpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
