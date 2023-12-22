@@ -27,32 +27,33 @@ func SubscribeWithObservability(done <-chan struct{}, ctx context.Context, strea
 }
 
 func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
-	isUnsubscribed := false
-
-	go func() {
-		<-done
-		logger := logging.LoggerWithProcess("NATS Subscription")
-		logger.Info("Context cancelled, unsubscribing from NATS JetStream")
-		err := sub.Drain()
-		if err != nil {
-			logger.Error("Error draining subscription", zap.Error(err))
-		}
-
-		isUnsubscribed = true
-		logger.Info("Successfully unsubscribed from NATS JetStream")
-	}()
+	//go func() {
+	//	<-done
+	//	logger := logging.LoggerWithProcess("NATS Subscription")
+	//	logger.Info("Context cancelled, unsubscribing from NATS JetStream")
+	//	err := sub.Drain()
+	//	if err != nil {
+	//		logger.Error("Error draining subscription", zap.Error(err))
+	//	}
+	//
+	//	isUnsubscribed = true
+	//	logger.Info("Successfully unsubscribed from NATS JetStream")
+	//}()
 
 	for {
-		//select {
-		//case <-done:
-		//	logger := logging.LoggerWithProcess("NATS Subscription")
-		//	logger.Info("Context cancelled, unsubscribing from NATS JetStream")
-		//	return sub.Unsubscribe()
-		//default:
-		//}
+		select {
+		case <-done:
+			logger := logging.LoggerWithProcess("NATS Subscription")
+			logger.Info("Context cancelled, unsubscribing from NATS JetStream")
+			err := sub.Drain()
+			if err != nil {
+				logger.Error("Error draining subscription", zap.Error(err))
+				return err
+			}
 
-		if isUnsubscribed {
+			logger.Info("Successfully unsubscribed from NATS JetStream")
 			return nil
+		default:
 		}
 
 		msg, err := sub.NextMsgWithContext(ctx)
