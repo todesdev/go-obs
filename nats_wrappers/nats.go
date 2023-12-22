@@ -14,24 +14,23 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) (*nats.Subscription, error) {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	err = handleSubscription(ctx, sub, handler)
-	return err
+	go func() {
+		if err := handleSubscription(ctx, sub, handler); err != nil {
+			panic(err)
+		}
+	}()
+
+	return sub, nil
 }
 
 func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return sub.Unsubscribe()
-		default:
-		}
-
+	for !sub.IsValid() {
 		natsCollector := natscollector.GetNATSCollector()
 
 		msg, err := sub.NextMsgWithContext(ctx)
@@ -67,6 +66,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 
 		obs.End()
 	}
+	return nil
 }
 
 func PublishTracedMessage(ctx context.Context, js nats.JetStreamContext, subject string, data []byte) error {
