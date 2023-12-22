@@ -34,7 +34,7 @@ func Initialize(config *Config) error {
 		return err
 	}
 
-	logging.Setup(validatedConfig.ServiceName, validatedConfig.ServiceVersion)
+	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion)
 
 	res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
 	if err != nil {
