@@ -15,22 +15,22 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) (*nats.Subscription, error) {
+func SubscribeWithObservability(done <-chan struct{}, ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	natsCollector := natscollector.GetNATSCollector()
 
-	err = handleSubscription(ctx, sub, handler, natsCollector)
-	return sub, err
+	err = handleSubscription(done, ctx, sub, handler, natsCollector)
+	return err
 }
 
-func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
+func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
 	logger := logging.LoggerWithProcess("NATS Subscription")
 	for {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			logger.Info("Context cancelled, unsubscribing from NATS JetStream")
 			return sub.Unsubscribe()
 		default:
