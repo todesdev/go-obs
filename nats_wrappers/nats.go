@@ -6,6 +6,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -14,24 +15,26 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) (*nats.Subscription, error) {
+func SubscribeWithObservability(ctx context.Context, wg *sync.WaitGroup, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) (*nats.Subscription, error) {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
 		return nil, err
 	}
+	natsCollector := natscollector.GetNATSCollector()
 
-	go func() {
-		if err := handleSubscription(ctx, sub, handler); err != nil {
-			panic(err)
-		}
-	}()
-
-	return sub, nil
+	err = handleSubscription(ctx, wg, sub, handler, natsCollector)
+	return sub, err
 }
 
-func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler) error {
-	for sub.IsValid() {
-		natsCollector := natscollector.GetNATSCollector()
+func handleSubscription(ctx context.Context, wg *sync.WaitGroup, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return sub.Unsubscribe()
+		default:
+		}
+		wg.Add(1)
+		defer wg.Done()
 
 		msg, err := sub.NextMsgWithContext(ctx)
 		if err != nil {
@@ -66,7 +69,6 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 
 		obs.End()
 	}
-	return nil
 }
 
 func PublishTracedMessage(ctx context.Context, js nats.JetStreamContext, subject string, data []byte) error {
