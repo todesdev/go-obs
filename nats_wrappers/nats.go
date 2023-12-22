@@ -2,6 +2,7 @@ package nats_wrappers
 
 import (
 	"context"
+	"github.com/todesdev/go-obs/internal/logging"
 	"github.com/todesdev/go-obs/internal/observer"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -26,9 +27,11 @@ func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subj
 }
 
 func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
+	logger := logging.LoggerWithProcess("NATS Subscription")
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Info("Context cancelled, unsubscribing from NATS JetStream")
 			return sub.Unsubscribe()
 		default:
 		}
