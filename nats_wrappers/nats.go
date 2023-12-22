@@ -27,10 +27,10 @@ func SubscribeWithObservability(done <-chan struct{}, ctx context.Context, strea
 }
 
 func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
-	logger := logging.LoggerWithProcess("NATS Subscription")
 	for {
 		select {
 		case <-done:
+			logger := logging.LoggerWithProcess("NATS Subscription")
 			logger.Info("Context cancelled, unsubscribing from NATS JetStream")
 			return sub.Unsubscribe()
 		default:
