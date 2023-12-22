@@ -33,10 +33,11 @@ func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Sub
 		<-done
 		logger := logging.LoggerWithProcess("NATS Subscription")
 		logger.Info("Context cancelled, unsubscribing from NATS JetStream")
-		err := sub.Unsubscribe()
+		err := sub.Drain()
 		if err != nil {
-			logger.Error("Error unsubscribing from NATS JetStream", zap.Error(err))
+			logger.Error("Error draining subscription", zap.Error(err))
 		}
+
 		isUnsubscribed = true
 		logger.Info("Successfully unsubscribed from NATS JetStream")
 	}()
