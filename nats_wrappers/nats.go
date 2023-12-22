@@ -30,7 +30,7 @@ func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subj
 }
 
 func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler) error {
-	for !sub.IsValid() {
+	for sub.IsValid() {
 		natsCollector := natscollector.GetNATSCollector()
 
 		msg, err := sub.NextMsgWithContext(ctx)
