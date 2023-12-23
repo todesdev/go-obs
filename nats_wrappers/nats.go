@@ -38,7 +38,7 @@ func handleSubscription(ctx context.Context, sub *nats.Subscription, handler Sub
 			if sub.IsValid() {
 				continue
 			}
-			logger.Error("Error receiving message from JetStream", zap.Error(err))
+			logger.Info("Stopped receiving messages", zap.Error(err))
 			return
 		}
 		startTime := time.Now()
