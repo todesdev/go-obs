@@ -15,64 +15,55 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) (*nats.Subscription, error) {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	natsCollector := natscollector.GetNATSCollector()
 
-	err = handleSubscription(ctx, sub, handler, natsCollector)
-	return err
+	go handleSubscription(ctx, sub, handler, natsCollector)
+	return sub, nil
 }
 
-func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
+func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) {
+	logger := logging.LoggerWithProcess("NATS Subscription")
 	for {
-		select {
-		case <-ctx.Done():
-			logger := logging.LoggerWithProcess("NATS Subscription")
-			logger.Info("Context cancelled, unsubscribing from NATS JetStream")
-			err := sub.Drain()
-			if err != nil {
-				logger.Error("Error draining subscription", zap.Error(err))
-				return err
+		msg, err := sub.NextMsgWithContext(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				logger.Error("Context cancelled, stopping subscription", zap.Error(err))
+				return
 			}
-			logger.Info("Successfully unsubscribed from NATS JetStream")
-			return nil
-		default:
-			msg, err := sub.NextMsgWithContext(ctx)
-			if err != nil {
-				// If the context has been canceled, return the context's error
-				if ctx.Err() != nil {
-					return ctx.Err()
-				}
-				return err
+			if sub.IsValid() {
+				logger.Error("Error receiving message from JetStream", zap.Error(err))
+				continue
 			}
+			return
+		}
+		startTime := time.Now()
+		subject := msg.Subject
 
-			startTime := time.Now()
-			subject := msg.Subject
+		prop := otel.GetTextMapPropagator()
+		headers := propHeader(msg.Header)
+		ctx = prop.Extract(ctx, headers)
 
-			prop := otel.GetTextMapPropagator()
-			headers := propHeader(msg.Header)
-			ctx = prop.Extract(ctx, headers)
+		obs := observer.ConsumerObserver(ctx, "NATS Consumer:"+subject)
+		obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
 
-			obs := observer.ConsumerObserver(ctx, "NATS Consumer:"+subject)
-			obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
-
-			err = handler(msg, obs.Ctx())
-			if err != nil {
-				elapsedTime := time.Since(startTime)
-				natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
-				obs.RecordErrorWithLogging("Error handling the message", err)
-				return err
-			}
-
+		err = handler(msg, obs.Ctx())
+		if err != nil {
 			elapsedTime := time.Since(startTime)
 			natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
-			natsCollector.PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
-			obs.RecordInfoWithLogging("Successfully processed message")
-			obs.End()
+			obs.RecordErrorWithLogging("Error handling the message", err)
+			return
 		}
+
+		elapsedTime := time.Since(startTime)
+		natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
+		natsCollector.PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
+		obs.RecordInfoWithLogging("Successfully processed message")
+		obs.End()
 	}
 }
 
