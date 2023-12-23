@@ -37,44 +37,44 @@ func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Sub
 				logger.Error("Error draining subscription", zap.Error(err))
 				return err
 			}
-
 			logger.Info("Successfully unsubscribed from NATS JetStream")
 			return nil
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
-		}
+			msg, err := sub.NextMsgWithContext(ctx)
+			if err != nil {
+				// If the context has been canceled, return the context's error
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return err
+			}
 
-		msg, err := sub.NextMsgWithContext(ctx)
-		if err != nil {
-			return err
-		}
+			startTime := time.Now()
+			subject := msg.Subject
 
-		startTime := time.Now()
-		subject := msg.Subject
+			prop := otel.GetTextMapPropagator()
+			headers := propHeader(msg.Header)
+			ctx = prop.Extract(ctx, headers)
 
-		prop := otel.GetTextMapPropagator()
-		headers := propHeader(msg.Header)
-		ctx = prop.Extract(ctx, headers)
+			obs := observer.ConsumerObserver(ctx, "NATS Consumer:"+subject)
+			obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
 
-		obs := observer.ConsumerObserver(ctx, "NATS Consumer:"+subject)
-		obs.LogInfo("NATS Consumer: Received new message", zap.String("subject", subject))
+			err = handler(msg, obs.Ctx())
+			if err != nil {
+				elapsedTime := time.Since(startTime)
+				natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
+				obs.RecordErrorWithLogging("Error handling the message", err)
+				return err
+			}
 
-		err = handler(msg, obs.Ctx())
-		if err != nil {
 			elapsedTime := time.Since(startTime)
 			natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
-
-			obs.RecordErrorWithLogging("Error handling the message", err)
-
-			return err
+			natsCollector.PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
+			obs.RecordInfoWithLogging("Successfully processed message")
+			obs.End()
 		}
-
-		elapsedTime := time.Since(startTime)
-		natsCollector.ProcessingDurationObserve(subject, natscollector.NatsJetStreamMessageType, elapsedTime)
-		natsCollector.PublishedMessagesInc(subject, natscollector.NatsJetStreamMessageType)
-
-		obs.RecordInfoWithLogging("Successfully processed message")
-
-		obs.End()
 	}
 }
 
