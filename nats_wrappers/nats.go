@@ -7,6 +7,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -15,31 +16,24 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(done <-chan struct{}, ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+func SubscribeWithObservability(wg *sync.WaitGroup, done <-chan struct{}, ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
 		return err
 	}
 	natsCollector := natscollector.GetNATSCollector()
 
-	err = handleSubscription(done, ctx, sub, handler, natsCollector)
-	return err
+	handlerWg := &sync.WaitGroup{}
+	handlerWg.Add(1)
+	err = handleSubscription(handlerWg, done, ctx, sub, handler, natsCollector)
+	if err != nil {
+		wg.Done()
+	}
+	return nil
 }
 
-func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
-	//go func() {
-	//	<-done
-	//	logger := logging.LoggerWithProcess("NATS Subscription")
-	//	logger.Info("Context cancelled, unsubscribing from NATS JetStream")
-	//	err := sub.Drain()
-	//	if err != nil {
-	//		logger.Error("Error draining subscription", zap.Error(err))
-	//	}
-	//
-	//	isUnsubscribed = true
-	//	logger.Info("Successfully unsubscribed from NATS JetStream")
-	//}()
-
+func handleSubscription(wg *sync.WaitGroup, done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
+	defer wg.Done()
 	for {
 		select {
 		case <-done:
