@@ -15,21 +15,21 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(done <-chan struct{}, ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
 		return err
 	}
 	natsCollector := natscollector.GetNATSCollector()
 
-	err = handleSubscription(done, ctx, sub, handler, natsCollector)
+	err = handleSubscription(ctx, sub, handler, natsCollector)
 	return err
 }
 
-func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
+func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			logger := logging.LoggerWithProcess("NATS Subscription")
 			logger.Info("Context cancelled, unsubscribing from NATS JetStream")
 			err := sub.Drain()
@@ -39,8 +39,6 @@ func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Sub
 			}
 			logger.Info("Successfully unsubscribed from NATS JetStream")
 			return nil
-		case <-ctx.Done():
-			return ctx.Err()
 		default:
 			msg, err := sub.NextMsgWithContext(ctx)
 			if err != nil {
