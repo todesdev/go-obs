@@ -7,7 +7,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
-	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -16,24 +15,18 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
-func SubscribeWithObservability(wg *sync.WaitGroup, done <-chan struct{}, ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
+func SubscribeWithObservability(done <-chan struct{}, ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) error {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
 		return err
 	}
 	natsCollector := natscollector.GetNATSCollector()
 
-	handlerWg := &sync.WaitGroup{}
-	handlerWg.Add(1)
-	err = handleSubscription(handlerWg, done, ctx, sub, handler, natsCollector)
-	if err != nil {
-		wg.Done()
-	}
-	return nil
+	err = handleSubscription(done, ctx, sub, handler, natsCollector)
+	return err
 }
 
-func handleSubscription(wg *sync.WaitGroup, done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
-	defer wg.Done()
+func handleSubscription(done <-chan struct{}, ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) error {
 	for {
 		select {
 		case <-done:
