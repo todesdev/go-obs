@@ -9,16 +9,24 @@ import (
 	systemcollector "github.com/todesdev/go-obs/internal/metrics/system_collector"
 )
 
-func Setup(serviceName string) *prometheus.Registry {
+func Setup(serviceName string, http bool, grpc bool, nats bool) *prometheus.Registry {
 	logger := logging.LoggerWithProcess("MetricsSetup")
 	logger.Info("Setting up metrics...")
 
 	registry := prometheus.NewRegistry()
 
 	systemcollector.Setup(registry, serviceName)
-	httpcollector.Setup(registry, serviceName)
-	grpccollector.Setup(registry, serviceName)
-	natscollector.Setup(registry, serviceName)
+	if http {
+		httpcollector.Setup(registry, serviceName)
+	}
+
+	if grpc {
+		grpccollector.Setup(registry, serviceName)
+	}
+
+	if nats {
+		natscollector.Setup(registry, serviceName)
+	}
 
 	logger.Info("Metrics setup complete")
 

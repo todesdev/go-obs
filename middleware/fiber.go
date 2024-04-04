@@ -21,7 +21,7 @@ func Observability() fiber.Handler {
 
 		startTime := time.Now()
 
-		requestID := uuid.New().String()[:7]
+		requestID := uuid.New().String()
 		c.Request().Header.Set("X-Request-ID", requestID)
 		c.Response().Header.Set("X-Request-ID", requestID)
 

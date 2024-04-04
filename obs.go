@@ -14,7 +14,7 @@ import (
 	"github.com/todesdev/go-obs/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 )
@@ -25,7 +25,12 @@ type Config struct {
 	ServiceVersion         string
 	Region                 string
 	OTLPGRPCEndpoint       string
+	TracingEnabled         bool
+	MetricsEnabled         bool
 	MetricsHandlerEndpoint string
+	MetricsHTTP            bool
+	MetricsGRPC            bool
+	MetricsNATS            bool
 }
 
 func Initialize(config *Config) error {
@@ -36,30 +41,34 @@ func Initialize(config *Config) error {
 
 	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion)
 
-	res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
-	if err != nil {
-		return err
-	}
-
-	if validatedConfig.OTLPGRPCEndpoint != "" {
-		err := tracing.SetupOtlpGrpcTracer(validatedConfig.OTLPGRPCEndpoint, validatedConfig.ServiceName, res)
+	if validatedConfig.TracingEnabled {
+		res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
 		if err != nil {
 			return err
 		}
-	} else {
-		err := tracing.SetupStdOutTracer(validatedConfig.ServiceName, res)
 
-		if err != nil {
-			return err
+		if validatedConfig.OTLPGRPCEndpoint != "" {
+			err := tracing.SetupOtlpGrpcTracer(validatedConfig.OTLPGRPCEndpoint, validatedConfig.ServiceName, res)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := tracing.SetupStdOutTracer(validatedConfig.ServiceName, res)
+
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	promRegistry := &prometheus.Registry{}
+	if validatedConfig.MetricsEnabled {
+		promRegistry := &prometheus.Registry{}
 
-	promRegistry = metrics.Setup(validatedConfig.ServiceName)
+		promRegistry = metrics.Setup(validatedConfig.ServiceName, validatedConfig.MetricsHTTP, validatedConfig.MetricsGRPC, validatedConfig.MetricsNATS)
 
-	registerFiberMiddleware(validatedConfig.FiberApp)
-	registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsHandlerEndpoint)
+		registerFiberMiddleware(validatedConfig.FiberApp)
+		registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsHandlerEndpoint)
+	}
 
 	return nil
 }

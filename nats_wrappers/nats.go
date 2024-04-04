@@ -15,6 +15,8 @@ import (
 
 type SubscribeHandler func(msg *nats.Msg, ctxOpts ...context.Context) error
 
+// SubscribeWithObservability subscribes to a subject and calls the handler function for each message received.
+// The handler function is called in a separate goroutine.
 func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subject, queue string, handler SubscribeHandler, opts ...nats.SubOpt) (*nats.Subscription, error) {
 	sub, err := stream.QueueSubscribeSync(subject, queue, opts...)
 	if err != nil {
@@ -26,6 +28,7 @@ func SubscribeWithObservability(ctx context.Context, stream nats.JetStream, subj
 	return sub, nil
 }
 
+// handleSubscription handles the subscription and calls the handler function for each message received.
 func handleSubscription(ctx context.Context, sub *nats.Subscription, handler SubscribeHandler, natsCollector *natscollector.NATSCollector) {
 	logger := logging.LoggerWithProcess("NATS Subscription")
 	for {
