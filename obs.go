@@ -85,6 +85,11 @@ func validateConfig(cfg *Config) (*Config, error) {
 	validatedConfig.ServiceName = cfg.ServiceName
 	validatedConfig.ServiceVersion = cfg.ServiceVersion
 	validatedConfig.Region = cfg.Region
+	validatedConfig.TracingEnabled = cfg.TracingEnabled
+	validatedConfig.MetricsEnabled = cfg.MetricsEnabled
+	validatedConfig.MetricsHTTP = cfg.MetricsHTTP
+	validatedConfig.MetricsGRPC = cfg.MetricsGRPC
+	validatedConfig.MetricsNATS = cfg.MetricsNATS
 
 	validatedConfig.OTLPGRPCEndpoint = cfg.OTLPGRPCEndpoint
 
