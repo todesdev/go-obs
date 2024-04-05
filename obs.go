@@ -66,7 +66,7 @@ func Initialize(config *Config) error {
 
 		promRegistry = metrics.Setup(validatedConfig.ServiceName, validatedConfig.MetricsHTTP, validatedConfig.MetricsGRPC, validatedConfig.MetricsNATS)
 
-		registerFiberMiddleware(validatedConfig.FiberApp)
+		registerFiberMiddleware(validatedConfig.FiberApp, validatedConfig.TracingEnabled, validatedConfig.MetricsEnabled)
 		registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsHandlerEndpoint)
 	}
 
@@ -125,8 +125,8 @@ func GRPCServerInterceptors() []grpc.ServerOption {
 	}
 }
 
-func registerFiberMiddleware(fiberApp *fiber.App) {
-	fiberApp.Use(middleware.Observability())
+func registerFiberMiddleware(fiberApp *fiber.App, tracingEnabled bool, metricsEnabled bool) {
+	fiberApp.Use(middleware.Observability(tracingEnabled, metricsEnabled))
 }
 
 func registerFiberMetricsHandler(fiberApp *fiber.App, registry *prometheus.Registry, metricsEndpoint string) {

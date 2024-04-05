@@ -1,38 +1,38 @@
 package logging
 
 import (
-	"encoding/json"
-	"errors"
+	"go.uber.org/zap/zapcore"
 	"os"
 
-	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
 var logger *zap.Logger
 
 func Setup(region, serviceName, serviceVersion string) {
-	rawJSON := []byte(`{
-		  "level": "info",
-		  "encoding": "json",
-		  "outputPaths": ["stdout"],
-		  "errorOutputPaths": ["stderr"],
-		  "encoderConfig": {
-		    "levelKey": "level",
-		    "timeKey": "timestamp",
-			"regionKey": "region",
-		    "serviceKey": "service",
-			"versionKey": "version",
-		    "instanceIdKey": "instanceID",
-		    "messageKey": "message",
-		    "levelEncoder": "lowercase",
-		    "timeEncoder": "epoch"
-		  }
-		}`)
 
-	var cfg zap.Config
-	if err := json.Unmarshal(rawJSON, &cfg); err != nil {
-		panic(err)
+	cfg := zap.Config{
+		Level:             zap.NewAtomicLevelAt(getLogLevel()),
+		Development:       false,
+		DisableCaller:     true,
+		DisableStacktrace: true,
+		Encoding:          "json",
+		EncoderConfig: zapcore.EncoderConfig{
+			MessageKey:     "message",
+			LevelKey:       "level",
+			TimeKey:        "timestamp",
+			NameKey:        "logger",
+			CallerKey:      "caller",
+			StacktraceKey:  "stacktrace",
+			SkipLineEnding: false,
+			LineEnding:     zapcore.DefaultLineEnding,
+			EncodeLevel:    zapcore.LowercaseLevelEncoder,
+			EncodeTime:     zapcore.EpochTimeEncoder,
+			EncodeDuration: zapcore.SecondsDurationEncoder,
+			EncodeCaller:   zapcore.ShortCallerEncoder,
+		},
+		OutputPaths:      []string{"stdout"},
+		ErrorOutputPaths: []string{"stderr"},
 	}
 	var err error
 
@@ -41,16 +41,10 @@ func Setup(region, serviceName, serviceVersion string) {
 		panic(err)
 	}
 
-	instanceID, err := getInstanceIP()
-	if err != nil {
-		instanceID = generateRandomInstanceID()
-	}
-
 	logger = logger.With(
 		zap.String("region", region),
 		zap.String("service", serviceName),
 		zap.String("version", serviceVersion),
-		zap.String("instanceID", instanceID),
 	)
 }
 
@@ -58,15 +52,17 @@ func getLogger() *zap.Logger {
 	return logger
 }
 
-func getInstanceIP() (string, error) {
-	instanceIP := os.Getenv("INSTANCE_IP")
-	if instanceIP == "" {
-		return "", errors.New("INSTANCE_IP not found")
+func getLogLevel() zapcore.Level {
+	switch os.Getenv("LOG_LEVEL") {
+	case "DEBUG":
+		return zapcore.DebugLevel
+	case "INFO":
+		return zapcore.InfoLevel
+	case "WARN":
+		return zapcore.WarnLevel
+	case "ERROR":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
 	}
-
-	return instanceIP, nil
-}
-
-func generateRandomInstanceID() string {
-	return uuid.New().String()[:7]
 }
