@@ -15,6 +15,12 @@ type Observer struct {
 	log  *logging.Logger
 }
 
+var tracingEnabled = false
+
+func SetTracingEnabled(enabled bool) {
+	tracingEnabled = enabled
+}
+
 func InternalObserver(ctx context.Context, process string) *Observer {
 	obs := &Observer{}
 
@@ -46,65 +52,109 @@ func ConsumerObserver(ctx context.Context, process string) *Observer {
 }
 
 func (o *Observer) observeInternal(ctx context.Context, process string) *Observer {
-	c, s := tracing.NewInternalTrace(ctx, process)
-	l := logging.TracedLoggerWithProcess(s, process)
-	o.ctx = c
-	o.span = s
+	if tracingEnabled {
+		c, s := tracing.NewInternalTrace(ctx, process)
+		l := logging.TracedLoggerWithProcess(s, process)
+		o.ctx = c
+		o.span = s
+		o.log = l
+		return o
+	}
+
+	l := logging.LoggerWithProcess(process)
+	o.ctx = ctx
 	o.log = l
 	return o
 }
 
 func (o *Observer) observeServer(ctx context.Context, process string) *Observer {
-	c, s := tracing.NewServerTrace(ctx, process)
-	l := logging.TracedLoggerWithProcess(s, process)
-	o.ctx = c
-	o.span = s
+	if tracingEnabled {
+		c, s := tracing.NewServerTrace(ctx, process)
+		l := logging.TracedLoggerWithProcess(s, process)
+		o.ctx = c
+		o.span = s
+		o.log = l
+		return o
+	}
+
+	l := logging.LoggerWithProcess(process)
+	o.ctx = ctx
 	o.log = l
 	return o
 }
 
 func (o *Observer) observeClient(ctx context.Context, process string) *Observer {
-	c, s := tracing.NewClientTrace(ctx, process)
-	l := logging.TracedLoggerWithProcess(s, process)
-	o.ctx = c
-	o.span = s
+	if tracingEnabled {
+		c, s := tracing.NewClientTrace(ctx, process)
+		l := logging.TracedLoggerWithProcess(s, process)
+		o.ctx = c
+		o.span = s
+		o.log = l
+		return o
+	}
+
+	l := logging.LoggerWithProcess(process)
+	o.ctx = ctx
 	o.log = l
 	return o
 }
 
 func (o *Observer) observeProducer(ctx context.Context, process string) *Observer {
-	c, s := tracing.NewProducerTrace(ctx, process)
-	l := logging.TracedLoggerWithProcess(s, process)
-	o.ctx = c
-	o.span = s
+	if tracingEnabled {
+		c, s := tracing.NewProducerTrace(ctx, process)
+		l := logging.TracedLoggerWithProcess(s, process)
+		o.ctx = c
+		o.span = s
+		o.log = l
+		return o
+	}
+
+	l := logging.LoggerWithProcess(process)
+	o.ctx = ctx
 	o.log = l
 	return o
 }
 
 func (o *Observer) observeConsumer(ctx context.Context, process string) *Observer {
-	c, s := tracing.NewConsumerTrace(ctx, process)
-	l := logging.TracedLoggerWithProcess(s, process)
-	o.ctx = c
-	o.span = s
+	if tracingEnabled {
+		c, s := tracing.NewConsumerTrace(ctx, process)
+		l := logging.TracedLoggerWithProcess(s, process)
+		o.ctx = c
+		o.span = s
+		o.log = l
+		return o
+	}
+
+	l := logging.LoggerWithProcess(process)
+	o.ctx = ctx
 	o.log = l
 	return o
 }
 
 func (o *Observer) RecordInfo(msg string) {
-	o.span.SetStatus(codes.Ok, msg)
+	if tracingEnabled {
+		o.span.SetStatus(codes.Ok, msg)
+	}
 }
 
 func (o *Observer) RecordInfoWithLogging(msg string, fields ...zap.Field) {
-	o.span.SetStatus(codes.Ok, msg)
+	if tracingEnabled {
+		o.span.SetStatus(codes.Ok, msg)
+	}
 	o.log.Info(msg, fields...)
 }
 
 func (o *Observer) RecordError(err error) {
-	o.span.RecordError(err)
+	if tracingEnabled {
+		o.span.RecordError(err)
+	}
 }
 
 func (o *Observer) RecordErrorWithLogging(msg string, err error, fields ...zap.Field) {
-	o.span.RecordError(err)
+	if tracingEnabled {
+		o.span.RecordError(err)
+	}
+
 	fields = append(fields, zap.Error(err))
 	o.log.Error(msg, fields...)
 }
@@ -132,5 +182,7 @@ func (o *Observer) Ctx() context.Context {
 }
 
 func (o *Observer) End() {
-	o.span.End()
+	if tracingEnabled {
+		o.span.End()
+	}
 }

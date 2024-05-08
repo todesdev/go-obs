@@ -2,6 +2,7 @@ package goobs
 
 import (
 	"github.com/todesdev/go-obs/internal/logging"
+	"github.com/todesdev/go-obs/internal/observer"
 	"github.com/todesdev/go-obs/internal/tracing"
 )
 
@@ -22,6 +23,7 @@ func InitializeGRPCObserver(cfg *GRPCObserverConfig) error {
 	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion)
 
 	if validatedConfig.TracingEnabled {
+		observer.SetTracingEnabled(true)
 		res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
 		if err != nil {
 			return err

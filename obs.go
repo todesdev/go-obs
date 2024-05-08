@@ -10,6 +10,7 @@ import (
 	"github.com/todesdev/go-obs/interceptors"
 	"github.com/todesdev/go-obs/internal/logging"
 	"github.com/todesdev/go-obs/internal/metrics"
+	"github.com/todesdev/go-obs/internal/observer"
 	"github.com/todesdev/go-obs/internal/tracing"
 	"github.com/todesdev/go-obs/middleware"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -42,6 +43,7 @@ func Initialize(config *Config) error {
 	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion)
 
 	if validatedConfig.TracingEnabled {
+		observer.SetTracingEnabled(true)
 		res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
 		if err != nil {
 			return err
