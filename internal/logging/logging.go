@@ -1,18 +1,16 @@
 package logging
 
 import (
-	"go.uber.org/zap/zapcore"
-	"os"
-
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var logger *zap.Logger
 
-func Setup(region, serviceName, serviceVersion string) {
+func Setup(region, serviceName, serviceVersion, logLevel string) {
 
 	cfg := zap.Config{
-		Level:             zap.NewAtomicLevelAt(getLogLevel()),
+		Level:             zap.NewAtomicLevelAt(getLogLevel(logLevel)),
 		Development:       false,
 		DisableCaller:     true,
 		DisableStacktrace: true,
@@ -52,8 +50,8 @@ func getLogger() *zap.Logger {
 	return logger
 }
 
-func getLogLevel() zapcore.Level {
-	switch os.Getenv("LOG_LEVEL") {
+func getLogLevel(level string) zapcore.Level {
+	switch level {
 	case "DEBUG":
 		return zapcore.DebugLevel
 	case "INFO":

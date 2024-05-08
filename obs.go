@@ -25,6 +25,7 @@ type Config struct {
 	ServiceName            string
 	ServiceVersion         string
 	Region                 string
+	LogLevel               string
 	OTLPGRPCEndpoint       string
 	TracingEnabled         bool
 	MetricsEnabled         bool
@@ -40,7 +41,7 @@ func Initialize(config *Config) error {
 		return err
 	}
 
-	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion)
+	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.LogLevel)
 
 	if validatedConfig.TracingEnabled {
 		observer.SetTracingEnabled(true)
@@ -87,6 +88,7 @@ func validateConfig(cfg *Config) (*Config, error) {
 	validatedConfig.ServiceName = cfg.ServiceName
 	validatedConfig.ServiceVersion = cfg.ServiceVersion
 	validatedConfig.Region = cfg.Region
+	validatedConfig.LogLevel = cfg.LogLevel
 	validatedConfig.TracingEnabled = cfg.TracingEnabled
 	validatedConfig.MetricsEnabled = cfg.MetricsEnabled
 	validatedConfig.MetricsHTTP = cfg.MetricsHTTP
