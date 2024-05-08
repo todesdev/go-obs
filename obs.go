@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -43,25 +44,45 @@ func Initialize(config *Config) error {
 
 	logging.Setup(validatedConfig.Region, validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.LogLevel)
 
+	logger := logging.LoggerWithProcess("observability:initialize")
+	logger.Info("Logger setup complete")
+
 	if validatedConfig.TracingEnabled {
 		observer.SetTracingEnabled(true)
 		res, err := registerResource(validatedConfig.ServiceName, validatedConfig.ServiceVersion, validatedConfig.Region)
 		if err != nil {
+			logger.Error("Failed to register resource", zap.Error(err))
 			return err
 		}
 
 		if validatedConfig.OTLPGRPCEndpoint != "" {
 			err := tracing.SetupOtlpGrpcTracer(validatedConfig.OTLPGRPCEndpoint, validatedConfig.ServiceName, res)
 			if err != nil {
-				return err
+				logger.Error("Failed to setup OTLP GRPC tracer", zap.Error(err))
+				logger.Info("Switching to STDOUT tracer")
+				err = tracing.SetupStdOutTracer(validatedConfig.ServiceName, res)
+				if err != nil {
+					logger.Error("Failed to setup STDOUT tracer", zap.Error(err))
+					return err
+				}
+
+				logger.Info("Tracing exporter set to STDOUT")
 			}
+			logger.Info("Tracing exporter set to OTLP GRPC")
 		} else {
 			err := tracing.SetupStdOutTracer(validatedConfig.ServiceName, res)
 
 			if err != nil {
+				logger.Error("Failed to setup STDOUT tracer", zap.Error(err))
 				return err
 			}
+
+			logger.Info("Tracing exporter set to STDOUT")
 		}
+
+		logger.Info("Tracing setup complete")
+	} else {
+		logger.Warn("Tracing is disabled")
 	}
 
 	if validatedConfig.MetricsEnabled {
@@ -71,6 +92,10 @@ func Initialize(config *Config) error {
 
 		registerFiberMiddleware(validatedConfig.FiberApp, validatedConfig.TracingEnabled, validatedConfig.MetricsEnabled)
 		registerFiberMetricsHandler(validatedConfig.FiberApp, promRegistry, validatedConfig.MetricsHandlerEndpoint)
+
+		logger.Info("Metrics setup complete")
+	} else {
+		logger.Warn("Metrics are disabled")
 	}
 
 	return nil
